@@ -5,7 +5,7 @@ This repository contains a gym one player implementation of the classic boardgam
 
 Clone repository
 ```bash
-git clone https://github.com/OliverRichter/Coding_Challenge
+git clone https://github.com/OliverRichter/Coding_Challenge.git
 ```
 Install environment
 ```bash
