@@ -12,7 +12,7 @@ eps = 0.3
 repetition_cost = -5
 
 
-class SarsaEpisode:
+class DqnEpisode:
     def __init__(self, input_dim, output_dim, hidden_dim, conv_filters, lr=1e-4, gamma=0.9, win_reward=win_reward, eps=eps):
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -23,7 +23,7 @@ class SarsaEpisode:
         self.eps = eps
         x = self.x = tf.placeholder(tf.float32, shape=[None, input_dim])
         self.r = tf.placeholder(tf.float32, shape=[None])
-        q = self.q = self.net(self.net(self.net(x)))  # [None, output_dim]
+        q = self.q = self.net(x)  # [None, output_dim]
         self.a_ph = tf.placeholder(tf.int32, shape=[None])
         self.greedy_a = tf.argmax(self.q, 1)
         self.q_a = tf.gather_nd(q, tf.transpose([
@@ -82,7 +82,7 @@ class SarsaEpisode:
         self.saver.restore(self.sess, "save/model_3.ckpt")
 
 
-class SarsaStep(SarsaEpisode):
+class DqnStep(DqnEpisode):
     def act_and_train(self, r, state):
         assert len(self.a_history) == 1
         assert len(self.s_history) == 1
@@ -116,10 +116,10 @@ def main():
     env = gym.make('Battleship-v0')
     s = env.reset().reshape([-1])
     if using_batch:
-        policy = SarsaEpisode(input_dim=100, output_dim=100,
+        policy = DqnEpisode(input_dim=100, output_dim=100,
                               hidden_dim=256, conv_filters=64)
     else:
-        policy = SarsaStep(input_dim=100, output_dim=100,
+        policy = DqnStep(input_dim=100, output_dim=100,
                            hidden_dim=256, conv_filters=64)
     if load:
         policy.load()
