@@ -24,15 +24,21 @@ class DqnEpisode:
         x = self.x = tf.placeholder(tf.float32, shape=[None, input_dim])
         self.r = tf.placeholder(tf.float32, shape=[None])
         q = self.q = self.net(x)  # [None, output_dim]
+        q_double = self.q_double = self.net(x)
         self.a_ph = tf.placeholder(tf.int32, shape=[None])
-        self.greedy_a = tf.argmax(self.q, 1)
+        self.greedy_a_double = tf.argmax(q_double, 1)
+        # self.greedy_a = tf.argmax(self.q, 1)
         self.q_a = tf.gather_nd(q, tf.transpose([
+            tf.range(tf.shape(q)[0]), self.a_ph]))
+        self.q_a_double = tf.gather_nd(q_double, tf.transpose([
             tf.range(tf.shape(q)[0]), self.a_ph]))
         self.s_history = []
         self.a_history = []
         self.running_a = []
         loss = tf.losses.mean_squared_error(self.r, self.q_a)
+        loss_double = tf.losses.mean_squared_error(self.r, self.q_a_double)
         self.train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+        self.train_op_double = tf.train.AdamOptimizer(lr).minimize(loss_double)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
@@ -53,7 +59,7 @@ class DqnEpisode:
     def act(self, s):
         self.s_history.append(s.copy())
         s = s.reshape([1, self.input_dim])
-        a = self.sess.run(self.greedy_a, feed_dict={self.x: s})[0]
+        a = self.sess.run(self.greedy_a_double, feed_dict={self.x: s})[0]
         if np.random.uniform() < self.eps:
             # if a in self.a_history:
             remain = [i for i in range(100) if i not in self.running_a]
@@ -62,7 +68,7 @@ class DqnEpisode:
         return a
 
     def train(self, r):
-        q_a_next, greedy_a = self.sess.run([self.q_a, self.greedy_a], feed_dict={
+        q_a_next, greedy_a = self.sess.run([self.q_a, self.greedy_a_double], feed_dict={
             self.x: self.s_history,
             self.a_ph: self.a_history})
         for i in range(r.shape[0]):
@@ -70,16 +76,16 @@ class DqnEpisode:
                 continue
             r[i] += self.gamma * q_a_next[i+1]
         # r = (r - np.mean(r)) / np.std(r)
-        self.sess.run(self.train_op, feed_dict={
+        self.sess.run([self.train_op, self.train_op_double], feed_dict={
                       self.x: self.s_history, self.r: r, self.a_ph: self.a_history})
         self.s_history.clear()
         self.a_history.clear()
 
     def save(self):
-        self.saver.save(self.sess, "save/model_3.ckpt")
+        self.saver.save(self.sess, "save/model.ckpt")
 
     def load(self):
-        self.saver.restore(self.sess, "save/model_3.ckpt")
+        self.saver.restore(self.sess, "save/model.ckpt")
 
 
 class DqnStep(DqnEpisode):
@@ -88,7 +94,7 @@ class DqnStep(DqnEpisode):
         assert len(self.s_history) == 1
         s = state.reshape([1, self.input_dim])
         a = self.sess.run(
-            self.greedy_a, feed_dict={self.x: s})[0]
+            self.greedy_a_double, feed_dict={self.x: s})[0]
         qs = self.sess.run(self.q, feed_dict={self.x: s})
         q_a_next = self.sess.run(self.q_a, feed_dict={
                                  self.x: s, self.a_ph: [a]})
@@ -96,7 +102,7 @@ class DqnStep(DqnEpisode):
             remain = [i for i in range(100) if i not in self.running_a]
             a = random.choice(remain)
         q_target = r + self.gamma * q_a_next
-        self.sess.run(self.train_op, feed_dict={self.x: self.s_history, self.r:
+        self.sess.run([self.train_op, self.train_op_double], feed_dict={self.x: self.s_history, self.r:
                                                 q_target, self.a_ph: self.a_history})
         self.s_history.clear()
         self.a_history.clear()
